@@ -18,5 +18,3 @@ jobs:
       - uses: gameltb/github-actions-hexo@master
         with:
           deploykey: ${{secrets.DEPLOY_KEY}}
-          username: gameltb
-          email: gamegccltb@gmail.com
