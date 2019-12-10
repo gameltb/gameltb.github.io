@@ -12,11 +12,6 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
-      - name: Cache node modules
-        uses: actions/cache@v1
-        with:
-          path: node_modules
-          key: ${{runner.OS}}-${{hashFiles('**/package-lock.json')}}
       - uses: gameltb/github-actions-hexo@master
         with:
           deploykey: ${{secrets.DEPLOY_KEY}}
