@@ -18,3 +18,5 @@ jobs:
       - uses: gameltb/github-actions-hexo@master
         with:
           deploykey: ${{secrets.DEPLOY_KEY}}
+          use_new_post_cmd: true
+          branch: raw
