@@ -16,7 +16,7 @@ tags: kvm
 ## 图形
 
 对于虚拟机的图形来说，在合适的硬件上可以让显卡直通虚拟机，叫做 [PCI passthrough](https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF)，打游戏都不成问题。但是这样不太灵活，直通要求虚拟机独占一块显卡和显示器。不过也可以使用[ LTT 的视频](https://www.bilibili.com/video/av68273308)中用的办法来提高灵活性。  
-如果使用的是 Intel 的核心显卡，你也可以使用由 Intel 开发的 iGVT-g 来获得满足轻度使用的性能，客户机可以使用未修改的 Intel 显卡驱动，兼容性也不错。  
+如果机器上有 Intel 的核显，你也可以使用由 Intel 开发的 iGVT-g 来获得满足轻度使用的性能，客户机可以使用未修改的 Intel 显卡驱动，兼容性也不错。  
 通用一点的是 Virgil 3D，令虚拟机使用主机的渲染节点，不过 windows 的驱动似乎还不太完善，性能个人没有测试，从搜索结果来看，似乎还不是特别好。
 
 - QEMU/Guest graphics acceleration  
@@ -97,3 +97,32 @@ virt-manager
 显示协议监听类型改为无，勾选 OpenGL。
 
 轻度使用这样就可以了。
+
+### 60FPS
+
+默认状态下qemu(版本4.2.0)显示的帧率最多为30FPS，要想更加流畅需要小小地修改一下。
+```diff
+diff --git a/include/ui/console.h b/include/ui/console.h
+index 281f9c145b..fa6c472042 100644
+--- a/include/ui/console.h
++++ b/include/ui/console.h
+@@ -26,7 +26,7 @@
+ #define QEMU_CAPS_LOCK_LED   (1 << 2)
+ 
+ /* in ms */
+-#define GUI_REFRESH_INTERVAL_DEFAULT    30
++#define GUI_REFRESH_INTERVAL_DEFAULT    17
+ #define GUI_REFRESH_INTERVAL_IDLE     3000
+ 
+ /* Color number is match to standard vga palette */
+
+```
+不过，即使做了以上修改，在使用virt-manager内置的spice连接直通虚拟机时，你可能会注意到鼠标看起来帧率并不高。临时的办法是把鼠标直通给虚拟机，这样就不会看起来卡卡的了。
+
+## windows10 虚拟机
+
+- https://pve.proxmox.com/wiki/Windows_10_guest_best_practices
+
+### 图形 iGVT-g
+
+- https://www.reddit.com/r/VFIO/comments/8h352p/guide_running_windows_via_qemukvm_and_intel_gvtg/
