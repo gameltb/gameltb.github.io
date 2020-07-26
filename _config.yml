@@ -92,6 +92,9 @@ ignore:
 ## Themes: https://hexo.io/themes/
 theme: hexo-theme-next
 
+theme_config:
+  scheme: Pisces
+
 # Deployment
 ## Docs: https://hexo.io/docs/deployment.html
 deploy:
