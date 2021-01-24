@@ -1,1 +1,0 @@
-EBAZ4205 PS uboot 和 kernel 配置
