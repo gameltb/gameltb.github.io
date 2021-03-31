@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  
+  <link rel="stylesheet" href="/lib/animate-css/animate.min.css">
+
+<script class="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Pisces","version":"8.0.0-rc.4","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}}};
+  </script>
+
+  <meta name="description" content="随笔可能有错误，请多包涵。 如果有时间可以到repo下提 issue，谢谢。  起&amp;emsp;&amp;emsp;最近想折腾一下 FPGA，需要安装 xilinx 的一套工具。这堆东西真的大。自己想了想，为了稳定性还有使用上的方便。决定将这一套工具安装到虚拟机内，虚拟机还能有快照。于是看了下 linux 下的虚拟机。&amp;emsp;&amp;emsp;最初想用 lxc 容器，它靠内核来隔离用户空间，性能应该是最好的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="折腾kvm虚拟机">
+<meta property="og:url" content="http://yoursite.com/2019/12/24/%E6%8A%98%E8%85%BEkvm%E8%99%9A%E6%8B%9F%E6%9C%BA/index.html">
+<meta property="og:site_name" content="对结">
+<meta property="og:description" content="随笔可能有错误，请多包涵。 如果有时间可以到repo下提 issue，谢谢。  起&amp;emsp;&amp;emsp;最近想折腾一下 FPGA，需要安装 xilinx 的一套工具。这堆东西真的大。自己想了想，为了稳定性还有使用上的方便。决定将这一套工具安装到虚拟机内，虚拟机还能有快照。于是看了下 linux 下的虚拟机。&amp;emsp;&amp;emsp;最初想用 lxc 容器，它靠内核来隔离用户空间，性能应该是最好的">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2019-12-24T01:01:34.000Z">
+<meta property="article:modified_time" content="2021-03-31T07:01:20.023Z">
+<meta property="article:author" content="gameltb">
+<meta property="article:tag" content="kvm linux">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2019/12/24/%E6%8A%98%E8%85%BEkvm%E8%99%9A%E6%8B%9F%E6%9C%BA/">
+
+
+<script class="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>折腾kvm虚拟机 | 对结</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  body { margin-top: 2rem; }
+
+  .use-motion .menu-item,
+  .use-motion .sidebar,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header {
+    visibility: visible;
+  }
+
+  .use-motion .header,
+  .use-motion .site-brand-container .toggle,
+  .use-motion .footer { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle,
+  .use-motion .custom-logo-image {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line {
+    transform: scaleX(1);
+  }
+
+  .search-pop-overlay, .sidebar-nav { display: none; }
+  .sidebar-panel { display: block; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <main class="main">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+        <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <h1 class="site-title">对结</h1>
+      <i class="logo-line"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+</div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <section class="post-toc-wrap sidebar-panel">
+          <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#起"><span class="nav-number">1.</span> <span class="nav-text">起</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#图形"><span class="nav-number">1.1.</span> <span class="nav-text">图形</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#存储"><span class="nav-number">1.2.</span> <span class="nav-text">存储</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#动态内存分配"><span class="nav-number">1.3.</span> <span class="nav-text">动态内存分配</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#最终想要的效果"><span class="nav-number">1.4.</span> <span class="nav-text">最终想要的效果</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#糖炒栗子"><span class="nav-number">2.</span> <span class="nav-text">糖炒栗子</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#准备"><span class="nav-number">2.1.</span> <span class="nav-text">准备</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#准备系统镜像"><span class="nav-number">2.1.1.</span> <span class="nav-text">准备系统镜像</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#新建虚拟机"><span class="nav-number">3.</span> <span class="nav-text">新建虚拟机</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#调整"><span class="nav-number">4.</span> <span class="nav-text">调整</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#减少磁盘空间浪费"><span class="nav-number">4.1.</span> <span class="nav-text">减少磁盘空间浪费</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#自动调整使用的内存"><span class="nav-number">4.2.</span> <span class="nav-text">自动调整使用的内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#图形-1"><span class="nav-number">4.3.</span> <span class="nav-text">图形</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#60FPS"><span class="nav-number">4.3.1.</span> <span class="nav-text">60FPS</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#windows10-虚拟机"><span class="nav-number">4.4.</span> <span class="nav-text">windows10 虚拟机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#图形-iGVT-g"><span class="nav-number">4.4.1.</span> <span class="nav-text">图形 iGVT-g</span></a></li></ol></li></ol></li></ol></div>
+      </section>
+      <!--/noindex-->
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">gameltb</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives">
+          <span class="site-state-item-count">5</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+
+
+
+      </section>
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </header>
+
+      
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div id="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+      <div class="main-inner">
+        
+
+        <div class="content post posts-expand">
+          
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/12/24/%E6%8A%98%E8%85%BEkvm%E8%99%9A%E6%8B%9F%E6%9C%BA/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="gameltb">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="对结">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          折腾kvm虚拟机
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2019-12-24 09:01:34" itemprop="dateCreated datePublished" datetime="2019-12-24T09:01:34+08:00">2019-12-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-03-31 15:01:20" itemprop="dateModified" datetime="2021-03-31T15:01:20+08:00">2021-03-31</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <ul>
+<li>随笔可能有错误，请多包涵。</li>
+<li>如果有时间可以到<a href="https://github.com/gameltb/gameltb.github.io/issues" target="_blank" rel="noopener">repo</a>下提 issue，谢谢。</li>
+</ul>
+<h1 id="起"><a href="#起" class="headerlink" title="起"></a>起</h1><p>&emsp;&emsp;最近想折腾一下 FPGA，需要安装 xilinx 的一套工具。这堆东西真的大。自己想了想，为了稳定性还有使用上的方便。决定将这一套工具安装到虚拟机内，虚拟机还能有快照。于是看了下 linux 下的虚拟机。<br>&emsp;&emsp;最初想用 lxc 容器，它靠内核来隔离用户空间，性能应该是最好的了，然而使用的还是和主机相同的内核，对于一些需要在内核上安装驱动的场景就不太合适了，弃之。<br>&emsp;&emsp;最后还是用上了“传统”的虚拟机，毕竟有时候还要用到 windows 下的一些工具。先想到的是 vmware，virtualbox 这样的，但是 vmware 要钱，virtualbox 的图形似乎不太好，看 LTT 看到 linux 下的 qemu+kvm 似乎性能不错，就找几篇 wiki 看了一下。才发现功能强大，性能损失可以到相当低的地步，内存也可以在运行时动态分配，自己火星了。想来很早之前用 android sdk 时用的模拟器性能差劲，导致对 qemu 印象不好，一直没用上这一套。用了好长一段时间双系统，切换是真的麻烦。</p>
+<h2 id="图形"><a href="#图形" class="headerlink" title="图形"></a>图形</h2><p>&emsp;&emsp;对于虚拟机的图形来说，在合适的硬件上可以让显卡直通虚拟机，叫做 <a href="https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF" target="_blank" rel="noopener">PCI passthrough</a>，打游戏都不成问题。但是这样不太灵活，直通要求虚拟机独占一块显卡和显示器。不过也可以使用<a href="https://www.bilibili.com/video/av68273308" target="_blank" rel="noopener"> LTT 的视频</a>中用的办法来提高灵活性。<br>&emsp;&emsp;如果机器上有 Intel 的核显，你也可以使用由 Intel 开发的 iGVT-g 来获得满足轻度使用的性能，客户机可以使用未修改的 Intel 显卡驱动，兼容性也不错。<br>&emsp;&emsp;通用一点的是 Virgil 3D，令虚拟机使用主机的渲染节点，不过 windows 的驱动似乎还不太完善，性能个人没有测试，从搜索结果来看，似乎还不是特别好。</p>
+<ul>
+<li>QEMU/Guest graphics acceleration<br><a href="https://wiki.archlinux.org/index.php/QEMU/Guest_graphics_acceleration" target="_blank" rel="noopener">https://wiki.archlinux.org/index.php/QEMU/Guest_graphics_acceleration</a></li>
+</ul>
+<h2 id="存储"><a href="#存储" class="headerlink" title="存储"></a>存储</h2><p>&emsp;&emsp;大概要感谢云计算和虚拟化的发展，qemu/kvm 在存储上是非常灵活的，既可以使用文件，也可以使用硬盘分区，还可以加上 lvm，使用跨盘跨分区的逻辑卷，这样的逻辑卷本身就有快照功能。更绝的是对于支持的 linux 客户机，使用 9p 或者新出的性能更好的 virtio-fs 可将 root 挂在在主机的文件夹中，这样不会有虚拟磁盘有可能产生的空间浪费，文件共享也更加轻松。不过这样没有快照，你可能需要手动配置 OverlayFS 来做到差不多的效果，这样的共享还可能会导致更多的漏洞。<br>&emsp;&emsp;我自己没有使用 lvm，又没有在使用前做好功课，使用 ext4 文件系统下的虚拟磁盘文件+ovmf uefi 启动，由于现在的（2019-12）libvirt 对 uefi 启动的虚拟机快照支持不完善，导致快照使用起来有点麻烦，叹气。</p>
+<h2 id="动态内存分配"><a href="#动态内存分配" class="headerlink" title="动态内存分配"></a>动态内存分配</h2><p>&emsp;&emsp;在设置好最大可以占用内存后，可以在虚拟机开机时动态调整实际占用的内存大小，要注意最大值不能在运行时调整。windows 客户机需要按照下面这个说明安装驱动。这个特性对日常桌面应用应该是提高了不少可用性。</p>
+<ul>
+<li>Windows VirtIO 驱动<br><a href="https://www.linux-kvm.org/page/WindowsGuestDrivers/Download_Drivers" target="_blank" rel="noopener">https://www.linux-kvm.org/page/WindowsGuestDrivers/Download_Drivers</a></li>
+</ul>
+<p>&emsp;&emsp;自动分配，启用之后感觉客户机吃内存时变卡了些。</p>
+<ul>
+<li><a href="https://www.linux-kvm.org/page/Projects/auto-ballooning" target="_blank" rel="noopener">https://www.linux-kvm.org/page/Projects/auto-ballooning</a></li>
+<li>使用 libvirt 时的配置方法<br><a href="https://libvirt.org/formatdomain.html#elementsMemBalloon" target="_blank" rel="noopener">https://libvirt.org/formatdomain.html#elementsMemBalloon</a></li>
+</ul>
+<h2 id="最终想要的效果"><a href="#最终想要的效果" class="headerlink" title="最终想要的效果"></a>最终想要的效果</h2><p>&emsp;&emsp;三大操作系统程序都能跑，性能损耗不大，存储空间和内存浪费小，互相隔离又有快照，还能轻松迁移。甚至可以跑个 androidx86，，，感觉总算得到了一个个人比较满意的环境。</p>
+<h1 id="糖炒栗子"><a href="#糖炒栗子" class="headerlink" title="糖炒栗子"></a>糖炒栗子</h1><p>&emsp;&emsp;下面用我的 arch 主机搭建一个用于 xilinx 工具的 ubuntu 18.04.3 lts 虚拟机。</p>
+<h2 id="准备"><a href="#准备" class="headerlink" title="准备"></a>准备</h2><p>&emsp;&emsp;安装</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo pacman -S qemu virt-manager</span><br></pre></td></tr></table></figure>
+
+<p>&emsp;&emsp;这里我选择 virt-manager 为图形前端方便使用。<br>你也可以通过命令使用 qemu 来直接运行虚拟机。</p>
+<h3 id="准备系统镜像"><a href="#准备系统镜像" class="headerlink" title="准备系统镜像"></a>准备系统镜像</h3><p>&emsp;&emsp;下载 ubuntu 之类的发行版选择一个速度快的镜像站点下载即可。</p>
+<h1 id="新建虚拟机"><a href="#新建虚拟机" class="headerlink" title="新建虚拟机"></a>新建虚拟机</h1><p>&emsp;&emsp;执行</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">virt-manager</span><br></pre></td></tr></table></figure>
+
+<p>&emsp;&emsp;添加连接 QEMU/KVM ，然后新建虚拟机，按照提示一步步来即可。在最后一步选择 在安装前自定义配置 ，在此时我们就可以做一些调整。</p>
+<h1 id="调整"><a href="#调整" class="headerlink" title="调整"></a>调整</h1><p>&emsp;&emsp;一些配置需要编辑 xml 文件，请先在虚拟系统管理器的首选项中启用 XML 编辑。<br>我们可以删除一些用不到的设备例如数位板，这样可以提高性能。详细配置可以参考下面两个链接。</p>
+<ul>
+<li>libvirt 配置文件说明<br><a href="https://libvirt.org/formatdomain.html" target="_blank" rel="noopener">https://libvirt.org/formatdomain.html</a></li>
+<li>虚拟化调试和优化指南<br><a href="https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html-single/virtualization_tuning_and_optimization_guide/index" target="_blank" rel="noopener">https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html-single/virtualization_tuning_and_optimization_guide/index</a></li>
+</ul>
+<h2 id="减少磁盘空间浪费"><a href="#减少磁盘空间浪费" class="headerlink" title="减少磁盘空间浪费"></a>减少磁盘空间浪费</h2><ul>
+<li><a href="https://chrisirwin.ca/posts/discard-with-kvm/" target="_blank" rel="noopener">https://chrisirwin.ca/posts/discard-with-kvm/</a></li>
+</ul>
+<h2 id="自动调整使用的内存"><a href="#自动调整使用的内存" class="headerlink" title="自动调整使用的内存"></a>自动调整使用的内存</h2><ul>
+<li><a href="https://libvirt.org/formatdomain.html#elementsMemBalloon" target="_blank" rel="noopener">https://libvirt.org/formatdomain.html#elementsMemBalloon</a></li>
+</ul>
+<h2 id="图形-1"><a href="#图形-1" class="headerlink" title="图形"></a>图形</h2><p>&emsp;&emsp;显卡类型改为 virtio ，勾选 3d acceleration。<br>显示协议监听类型改为无，勾选 OpenGL。</p>
+<p>&emsp;&emsp;轻度使用这样就可以了。</p>
+<h3 id="60FPS"><a href="#60FPS" class="headerlink" title="60FPS"></a>60FPS</h3><p>&emsp;&emsp;默认状态下 qemu(版本 4.2.0)显示的帧率最多为 30FPS，要想更加流畅需要小小地修改一下。</p>
+<figure class="highlight diff"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">diff --git a/include/ui/console.h b/include/ui/console.h</span><br><span class="line">index 281f9c145b..fa6c472042 100644</span><br><span class="line"><span class="comment">--- a/include/ui/console.h</span></span><br><span class="line"><span class="comment">+++ b/include/ui/console.h</span></span><br><span class="line"><span class="meta">@@ -26,7 +26,7 @@</span></span><br><span class="line"> #define QEMU_CAPS_LOCK_LED   (1 &lt;&lt; 2)</span><br><span class="line"></span><br><span class="line"> /* in ms */</span><br><span class="line"><span class="deletion">-#define GUI_REFRESH_INTERVAL_DEFAULT    30</span></span><br><span class="line"><span class="addition">+#define GUI_REFRESH_INTERVAL_DEFAULT    17</span></span><br><span class="line"> #define GUI_REFRESH_INTERVAL_IDLE     3000</span><br><span class="line"></span><br><span class="line"> /* Color number is match to standard vga palette */</span><br></pre></td></tr></table></figure>
+
+<p>&emsp;&emsp;不过，即使做了以上修改，在使用 virt-manager 内置的 spice 连接直通虚拟机时，你可能会注意到鼠标看起来帧率并不高。临时的办法是把鼠标直通给虚拟机，这样就不会看起来卡卡的了。</p>
+<h2 id="windows10-虚拟机"><a href="#windows10-虚拟机" class="headerlink" title="windows10 虚拟机"></a>windows10 虚拟机</h2><ul>
+<li><a href="https://pve.proxmox.com/wiki/Windows_10_guest_best_practices" target="_blank" rel="noopener">https://pve.proxmox.com/wiki/Windows_10_guest_best_practices</a></li>
+</ul>
+<h3 id="图形-iGVT-g"><a href="#图形-iGVT-g" class="headerlink" title="图形 iGVT-g"></a>图形 iGVT-g</h3><ul>
+<li><a href="https://www.reddit.com/r/VFIO/comments/8h352p/guide_running_windows_via_qemukvm_and_intel_gvtg/" target="_blank" rel="noopener">https://www.reddit.com/r/VFIO/comments/8h352p/guide_running_windows_via_qemukvm_and_intel_gvtg/</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/kvm-linux/" rel="tag"># kvm linux</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2019/12/11/%E7%AC%AC%E4%B8%80%E7%AF%87%E5%8D%9A%E5%AE%A2/" rel="prev" title="第一篇博客">
+      <i class="fa fa-chevron-left"></i> 第一篇博客
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/04/18/%E9%9A%8F%E6%83%B3/" rel="next" title="随想">
+      随想 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+        </div>
+        
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">gameltb</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
