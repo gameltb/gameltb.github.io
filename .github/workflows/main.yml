@@ -5,6 +5,8 @@ on:
       - raw
   schedule:
       - cron:  '0 6 1/6 * *'
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest

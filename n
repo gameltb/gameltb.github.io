@@ -1,0 +1,1 @@
+qemu note for vms
